@@ -1,0 +1,4 @@
+﻿__pycache__/
+*.pyc
+credit_model.pkl
+.vscode/
