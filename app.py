@@ -1,6 +1,8 @@
 ﻿import streamlit as st
 import pandas as pd
+import numpy as np
 import pickle
+import os
 
 st.set_page_config(page_title="Safaricom Credit Scoring Demo", page_icon="💳", layout="centered")
 
@@ -10,14 +12,50 @@ This is a demonstration of an end-to-end Machine Learning pipeline built for **C
 It simulates how Telco/GSM data can be used to predict loan default risk.
 """)
 
-# Load model
+# Auto-train model if it doesn't exist (for cloud deployment)
 @st.cache_resource
-def load_model():
-    with open('credit_model.pkl', 'rb') as f:
-        return pickle.load(f)
+def load_or_train_model():
+    model_path = 'credit_model.pkl'
+    
+    if not os.path.exists(model_path):
+        st.info("🔄 First run detected. Training model on the fly (this takes ~5 seconds)...")
+        
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.model_selection import train_test_split
+        
+        # Generate synthetic data
+        np.random.seed(42)
+        n_samples = 10000
+        data = {
+            'age': np.random.randint(18, 70, n_samples),
+            'monthly_income': np.random.randint(1000, 50000, n_samples),
+            'loan_amount': np.random.randint(500, 20000, n_samples),
+            'tenure_months': np.random.randint(1, 120, n_samples),
+            'num_late_payments': np.random.randint(0, 10, n_samples),
+            'data_usage_gb': np.random.uniform(1.0, 50.0, n_samples)
+        }
+        df = pd.DataFrame(data)
+        
+        risk_score = (df['num_late_payments'] * 0.5) + (df['loan_amount'] / df['monthly_income']) - (df['tenure_months'] * 0.01)
+        df['default'] = (risk_score > 1.5).astype(int)
+        
+        X = df.drop('default', axis=1)
+        y = df['default']
+        
+        model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model.fit(X, y)
+        
+        # Save model for future runs
+        with open(model_path, 'wb') as f:
+            pickle.dump(model, f)
+        
+        return model
+    else:
+        with open(model_path, 'rb') as f:
+            return pickle.load(f)
 
 try:
-    model = load_model()
+    model = load_or_train_model()
     
     st.subheader("Customer Data Input")
     col1, col2 = st.columns(2)
@@ -33,7 +71,6 @@ try:
         data_usage = st.number_input("Monthly Data Usage (GB)", min_value=1.0, value=10.0)
 
     if st.button("Calculate Credit Risk", type="primary"):
-        # Prepare input
         input_df = pd.DataFrame([{
             'age': age,
             'monthly_income': income,
@@ -43,8 +80,7 @@ try:
             'data_usage_gb': data_usage
         }])
         
-        # Predict
-        prediction = model.predict(input_data)[0] if 'input_data' in locals() else model.predict(input_df)[0]
+        prediction = model.predict(input_df)[0]
         probability = model.predict_proba(input_df)[0][1]
         
         st.markdown("---")
@@ -58,7 +94,7 @@ try:
             st.markdown("**Recommendation:** Approve loan.")
             
 except Exception as e:
-    st.error(f"Error loading model. Please run `python train_model.py` first. Details: {e}")
+    st.error(f"Error: {e}")
 
 st.markdown("---")
 st.caption("Developed by Shimeles Tadesse Zelelew | Proof of Work for Safaricom ML Engineer Role")
