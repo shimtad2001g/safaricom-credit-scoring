@@ -98,3 +98,5 @@ except Exception as e:
 
 st.markdown("---")
 st.caption("Developed by Shimeles Tadesse Zelelew | Proof of Work for Safaricom ML Engineer Role")
+
+# Forced rebuild to clear Streamlit Cloud routing cache - 11/12/2026 15:21:24
